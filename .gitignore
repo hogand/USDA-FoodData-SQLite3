@@ -1,0 +1,5 @@
+/extract/
+/.mypy_cache/
+/venv3/
+
+*~
