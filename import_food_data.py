@@ -446,6 +446,9 @@ def process(directory: str, database: str, force: bool = False, batch: int = 100
 
     # Import in this order so it will not cause problems with foreign key
     # constraints.
+    # Note that in the October 2021 dataset, you need to rename the following files:
+    #    acquisition_samples.csv -> acquisition_sample.csv
+    #    agricultural_samples.csv -> agricultural_acquisition.csv
     ordered = [
         'food_category.csv',
         'food.csv',
