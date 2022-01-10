@@ -73,10 +73,13 @@ def query_counts(cursor: sqlite3.Cursor, csv_count_file: str, verbose: bool = Fa
             row = [x.replace('"', '') for x in row]
             table, count = row[0], int(row[1])
 
-            num_rows = cursor.execute(f'''
-SELECT COUNT(*) AS {table}_count
-FROM {table};
-''').fetchone()[0]
+            try:
+              num_rows = cursor.execute(f'''
+  SELECT COUNT(*) AS {table}_count
+  FROM {table};
+  ''').fetchone()[0]
+            except sqlite3.OperationalError as err:
+              print(f"Ignoring: {type(err)}: {err=}")
             if verbose:
                 print(f"Inserted {num_rows} into {table}")
             if num_rows != count:
@@ -107,34 +110,51 @@ CREATE TABLE agricultural_acquisition (
 CREATE TABLE branded_food (
   "fdc_id"                     INT NOT NULL PRIMARY KEY REFERENCES food(fdc_id),
   "brand_owner"                TEXT,  -- XXX Inconsistent names
+  "brand_name"                 TEXT,
+  "subbrand_name"              TEXT,
   "gtin_upc"                   TEXT,
   "ingredients"                TEXT,
+  "not_a_significant_source_of" TEXT,
   "serving_size"               REAL,
-  "serving_size_unit"          TEXT
-      CHECK(serving_size_unit IN ('g', 'ml')),
+--  "serving_size_unit"          TEXT
+--      CHECK(serving_size_unit IS NULL OR
+--            serving_size_unit IN ('g', 'ml')),
+  "serving_size_unit"          TEXT,
   "household_serving_fulltext" TEXT,
   "branded_food_category"      TEXT,
-  "data_source"                TEXT
-      CHECK(data_source IN ('GDSN', 'LI')),
-  "modified_date"              TEXT
-      CHECK(modified_date IS NULL OR
-            modified_date GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]' IS 1),
-  "available_date"             TEXT
-      CHECK(available_date IS NULL OR
-            available_date GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]' IS 1)
+--  "data_source"                TEXT
+--      CHECK(data_source IS NULL OR data_source IN ('GDSN', 'LI')),
+  "data_source"                TEXT,
+  "package_weight"             TEXT,
+--  "modified_date"              TEXT
+--      CHECK(modified_date IS NULL OR
+--            modified_date GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]' IS 1),
+--  "available_date"             TEXT
+--      CHECK(available_date IS NULL OR
+--            available_date GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]' IS 1),
+  "modified_date"              TEXT,
+  "available_date"             TEXT,
+  "market_country"             TEXT,
+--  "discontinued_date"              TEXT
+--      CHECK(discontinued_date IS NULL OR
+--            discontinued_date GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]' IS 1)
+  "discontinued_date"              TEXT
 );
 
 CREATE INDEX idx_branded_food_gtin_upc              ON branded_food (gtin_upc);
 CREATE INDEX idx_branded_food_branded_food_category ON branded_food (branded_food_category);
 
 CREATE TABLE food (
-  fdc_id           INT NOT NULL PRIMARY KEY,
-  data_type        TEXT,
-  description      TEXT,
-  food_category_id INT REFERENCES food_category(id),
-  publication_date TEXT
+  "fdc_id"           INT NOT NULL PRIMARY KEY,
+  "data_type"        TEXT,
+  "description"      TEXT,
+--  "food_category_id" INT REFERENCES food_category(id),
+  "food_category_id" INT,
+  "publication_date" TEXT
       CHECK(publication_date IS NULL OR
             publication_date GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]' IS 1)
+--  "scientific_name"  TEXT
+--  "food_key"         TEXT
 );
 
 CREATE INDEX idx_food_data_type        ON food (data_type);
@@ -159,7 +179,8 @@ CREATE TABLE food_attribute_type (
 );
 
 CREATE TABLE food_calorie_conversion_factor (
-  "food_nutrient_conversion_factor_id" INT NOT NULL PRIMARY KEY REFERENCES food_nutrient_conversion_factor(id),
+--  "food_nutrient_conversion_factor_id" INT NOT NULL PRIMARY KEY REFERENCES food_nutrient_conversion_factor(id),
+  "food_nutrient_conversion_factor_id" INT NOT NULL PRIMARY KEY,
   "protein_value"      REAL,
   "fat_value"          REAL,
   "carbohydrate_value" REAL
@@ -192,15 +213,19 @@ CREATE INDEX idx_food_component_fdc_id ON food_component (fdc_id);
 
 CREATE TABLE food_nutrient (
   "id"                INT NOT NULL PRIMARY KEY,
-  "fdc_id"            INT REFERENCES food(fdc_id),
-  "nutrient_id"       INT REFERENCES nutrient(id),
+--  "fdc_id"            INT REFERENCES food(fdc_id),
+  "fdc_id"            INT,
+--  "nutrient_id"       INT REFERENCES nutrient(id),
+  "nutrient_id"       INT,
   "amount"            REAL,
   "data_points"       INT,
-  "derivation_id"     INT REFERENCES food_nutrient_derivation(id),
+--  "derivation_id"     INT REFERENCES food_nutrient_derivation(id),
+  "derivation_id"     INT,
   -- XXX Missing standard_error from Field Descriptions
   "min"               REAL,
   "max"               REAL,
   "median"            REAL,
+  "loq"               REAL,
   "footnote"          TEXT,
   "min_year_acquired" TEXT
       CHECK(min_year_acquired IS NULL OR
@@ -256,6 +281,14 @@ CREATE TABLE food_protein_conversion_factor (
   "food_nutrient_conversion_factor_id" INT NOT NULL PRIMARY KEY REFERENCES food_nutrient_conversion_factor(id),
   "value"                              REAL
 );
+
+-- CREATE TABLE food_update_log_entry (
+--   "fdc_id"               INT REFERENCES food(fdc_id),
+--   "description"          TEXT,
+--   "publication_date"   TEXT
+--       CHECK(publication_date IS NULL OR
+--             publication_date GLOB '[0-9][0-9][0-9][0-9]' IS 1)
+-- );
 
 CREATE TABLE foundation_food (
   "fdc_id"     INT NOT NULL PRIMARY KEY REFERENCES food(fdc_id),
@@ -329,6 +362,7 @@ CREATE TABLE market_acquisition (
 CREATE TABLE measure_unit (
   "id"   INT NOT NULL PRIMARY KEY,
   "name" TEXT UNIQUE
+--  "abbreviation" TEXT
 );
 
 CREATE TABLE nutrient (
@@ -368,8 +402,10 @@ CREATE TABLE sr_legacy_food (
 );
 
 CREATE TABLE sub_sample_food (
-  "fdc_id"                INT NOT NULL PRIMARY KEY REFERENCES food(fdc_id),
-  "fdc_id_of_sample_food" INT REFERENCES food(fdc_id)
+--  "fdc_id"                INT NOT NULL PRIMARY KEY REFERENCES food(fdc_id),
+  "fdc_id"                INT NOT NULL PRIMARY KEY,
+--  "fdc_id_of_sample_food" INT REFERENCES food(fdc_id)
+  "fdc_id_of_sample_food" INT
 );
 
 CREATE INDEX idx_sub_sample_food_fdc_id_of_sample_food ON sub_sample_food (fdc_id_of_sample_food);
@@ -443,6 +479,16 @@ def process(directory: str, database: str, force: bool = False, batch: int = 100
         'food_nutrient.csv',
         'sub_sample_result.csv',
         'all_downloaded_table_record_counts.csv',
+        'fndds_derivation.csv',
+        'fndds_ingredient_nutrient_value.csv',
+        'food_update_log_entry.csv',
+    ]
+
+    ignore = [
+        'all_downloaded_table_record_counts.csv',
+        'fndds_derivation.csv',
+        'fndds_ingredient_nutrient_value.csv',
+        'food_update_log_entry.csv',
     ]
 
     # Make sure we accounted for everything
@@ -469,7 +515,7 @@ PRAGMA foreign_keys = ON;
         sqlite3_schema(cursor)
 
         for fname in ordered:
-            if fname == "all_downloaded_table_record_counts.csv":
+            if fname in ignore:
                 print(f"Skipping {fname}")
             else:
                 print(f"Importing {fname}")
@@ -514,9 +560,12 @@ def main() -> None:
                         help='Whether to clobber output file')
     parser.add_argument('-v', '--verbose', action='store_true', default=False,
                         help='Verbose output')
+    parser.add_argument('-c', '--check', action='store_true', default=False,
+                        help="Only check the database, don't create it")
     args = parser.parse_args()
 
-    process(args.directory, args.output, args.force, args.batch, args.verbose)
+    if not args.check:
+      process(args.directory, args.output, args.force, args.batch, args.verbose)
     check(args.directory, args.output, args.verbose)
 
 

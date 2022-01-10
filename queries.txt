@@ -1,0 +1,48 @@
+--SELECT food.data_type, food.description, food_nutrient.amount AS 'amount per 100g', food_nutrient.min, food_nutrient.max, nutrient.name, nutrient.unit_name
+--FROM ((food INNER JOIN food_nutrient ON food.fdc_id = food_nutrient.fdc_id) INNER JOIN nutrient ON food_nutrient.nutrient_id = nutrient.id) 
+--WHERE 
+--food.description LIKE 'Apple'
+--AND
+--nutrient.name LIKE 'energy' AND nutrient.unit_name LIKE 'kcal'
+
+SELECT 
+	f.data_type, 
+	f.description, 
+	fn.amount AS 'kcal_per_100g', 
+	fn.min, 
+	fn.max, 
+	n.name, 
+	n.unit_name,
+	fp.amount as 'portion_amount', 
+	mu.name as 'portion_unit',
+	fp.portion_description, 
+	fp.modifier as 'portion_modifier', 
+	fp.gram_weight as 'portion_gram_weight',
+	bf.brand_owner,
+	bf.serving_size as 'branded_serving_size',
+	bf.serving_size_unit as 'branded_serving_unit',
+	bf.household_serving_fulltext as 'branded_serving_household_unit',
+	bf.ingredients as 'branded_ingredients'
+	
+FROM 
+	(((((food f LEFT JOIN food_nutrient fn ON f.fdc_id = fn.fdc_id) 
+		   LEFT JOIN nutrient n ON fn.nutrient_id = n.id)
+		   LEFT JOIN food_portion fp on f.fdc_id = fp.fdc_id)
+		   LEFT JOIN measure_unit mu on fp.measure_unit_id = mu.id)
+		   LEFT JOIN branded_food bf on f.fdc_id = bf.fdc_id)
+WHERE 
+--food.description LIKE '%apple%'
+--AND
+n.name LIKE 'energy' AND n.unit_name LIKE 'kcal'
+
+
+
+
+--SELECT food.description, food_attribute.name, food_attribute.value from food inner join food_attribute on food.fdc_id = food_attribute.fdc_id
+
+--SELECT * from food_portion
+
+--SELECT DISTINCT food.food_category_id from food;
+--SELECT food.food_category_id, food_category.description from food inner JOIN food_category ON food.food_category_id = food_category.id;
+
+-- SELECT food.*, food_category.description FROM food LEFT JOIN food_category ON food.food_category_id = food_category.id
