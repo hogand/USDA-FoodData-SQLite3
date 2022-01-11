@@ -1,10 +1,33 @@
---SELECT food.data_type, food.description, food_nutrient.amount AS 'amount per 100g', food_nutrient.min, food_nutrient.max, nutrient.name, nutrient.unit_name
---FROM ((food INNER JOIN food_nutrient ON food.fdc_id = food_nutrient.fdc_id) INNER JOIN nutrient ON food_nutrient.nutrient_id = nutrient.id) 
---WHERE 
---food.description LIKE 'Apple'
---AND
---nutrient.name LIKE 'energy' AND nutrient.unit_name LIKE 'kcal'
+SELECT 
+	f.data_type, 
+	f.description, 
+	kcal_per_100g,
+	protein_per_100g,
+	fiber_per_100g,
+	carbs_per_100g,
+	fats_per_100g,
+	(CASE WHEN f.data_type LIKE 'branded%' THEN bf.household_serving_fulltext ELSE 
+		(CASE WHEN f.data_type LIKE 'survey%' THEN fp.portion_description ELSE 
+		(CASE WHEN f.data_type LIKE 'founda%' THEN fp.amount || ' ' || mu.name 
+											ELSE fp.amount || ' ' || fp.modifier END) END) END)  as 'serving',
+	CASE WHEN f.data_type LIKE 'branded%' THEN bf.serving_size ELSE fp.gram_weight END as 'serving_size',
+	CASE WHEN f.data_type LIKE 'branded%' THEN bf.serving_size_unit ELSE 'g' END as 'serving_size_unit'
+	
+FROM 
+	((((((((food f LEFT JOIN food_portion fp ON f.fdc_id = fp.fdc_id
+	-- this next line forces just one row of several matches (which have different serving sizes)
+								AND fp.id = (SELECT id FROM food_portion WHERE f.fdc_id = food_portion.fdc_id LIMIT 1))
+		   LEFT JOIN measure_unit mu ON fp.measure_unit_id = mu.id)
+		   LEFT JOIN branded_food bf ON f.fdc_id = bf.fdc_id)
+		   LEFT JOIN ( SELECT fdc_id, amount AS 'kcal_per_100g' FROM food_nutrient LEFT JOIN nutrient ON food_nutrient.nutrient_id = nutrient.id WHERE name LIKE 'energy' AND unit_name LIKE 'kcal') t1 ON t1.fdc_id = f.fdc_id)
+		   LEFT JOIN ( SELECT fdc_id, amount AS 'protein_per_100g' FROM food_nutrient LEFT JOIN nutrient ON food_nutrient.nutrient_id = nutrient.id WHERE name LIKE 'Protein%' AND unit_name LIKE 'G') t2 ON t2.fdc_id = f.fdc_id)
+		   LEFT JOIN ( SELECT fdc_id, amount AS 'fiber_per_100g' FROM food_nutrient LEFT JOIN nutrient ON food_nutrient.nutrient_id = nutrient.id WHERE name LIKE 'Fiber%' AND unit_name LIKE 'G') t3 ON t3.fdc_id = f.fdc_id)
+		   LEFT JOIN ( SELECT fdc_id, amount AS 'carbs_per_100g' FROM food_nutrient LEFT JOIN nutrient ON food_nutrient.nutrient_id = nutrient.id WHERE name LIKE 'Carbohydrate%' AND unit_name LIKE 'G') t4 ON t4.fdc_id = f.fdc_id)
+		   LEFT JOIN ( SELECT fdc_id, amount AS 'fats_per_100g' FROM food_nutrient LEFT JOIN nutrient ON food_nutrient.nutrient_id = nutrient.id WHERE name LIKE 'Total lipid%' AND unit_name LIKE 'G') t5 ON t5.fdc_id = f.fdc_id)
 
+WHERE kcal_per_100g IS NOT NULL;
+
+/*
 SELECT 
 	f.data_type, 
 	f.description, 
@@ -34,7 +57,7 @@ WHERE
 --food.description LIKE '%apple%'
 --AND
 n.name LIKE 'energy' AND n.unit_name LIKE 'kcal'
-
+*/
 
 
 
